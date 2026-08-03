@@ -1,0 +1,46 @@
+name: CD - Deploy to EC2
+
+on:
+  workflow_run:
+    workflows: ["CI - Build and Push to ECR"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # This is the magic step that sends the compose and nginx files to EC2!
+      - name: Copy docker-compose and nginx to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml,nginx/"
+          target: "/home/${{ secrets.EC2_USERNAME }}/meridian-retail"
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 1. Authenticate the EC2 instance with AWS ECR
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY_URL }}
+            
+            # 2. Go to the folder where the SCP step just pasted our files
+            cd /home/${{ secrets.EC2_USERNAME }}/meridian-retail
+            
+            # 3. Create a .env file on the fly so Docker Compose knows exactly which unique IMAGE_TAG to pull
+            echo "IMAGE_TAG=${{ github.sha }}" > .env
+            echo "ECR_REGISTRY_URL=${{ secrets.ECR_REGISTRY_URL }}" >> .env
+            
+            # 4. Pull the fresh immutable images and start them up
+            docker compose pull
+            docker compose up -d

@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-meridian_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - meridian-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-meridian_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build: ./auth-service
+    image: ${ECR_REGISTRY_URL}/meridian-auth:${IMAGE_TAG:-latest}
+    container_name: auth-service
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-meridian_db}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+      - JWT_EXPIRY_MINUTES=${JWT_EXPIRY_MINUTES:-60}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - meridian-network
+
+  catalog-service:
+    build: ./catalog-service
+    image: ${ECR_REGISTRY_URL}/meridian-catalog:${IMAGE_TAG:-latest}
+    container_name: catalog-service
+    ports:
+      - "8002:4000"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-meridian_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - meridian-network
+
+  orders-service:
+    build: ./orders-service
+    image: ${ECR_REGISTRY_URL}/meridian-orders:${IMAGE_TAG:-latest}
+    container_name: orders-service
+    ports:
+      - "8003:8001"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-meridian_db}
+      - AUTH_SERVICE_URL=http://auth-service:8000
+      - CATALOG_SERVICE_URL=http://catalog-service:4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - meridian-network
+
+  frontend:
+    build: ./frontend
+    image: ${ECR_REGISTRY_URL}/meridian-frontend:${IMAGE_TAG:-latest}
+    container_name: frontend
+    ports:
+      - "8080:80"
+    networks:
+      - meridian-network
+
+networks:
+  meridian-network:
+    driver: bridge
+
+volumes:
+  pgdata:
