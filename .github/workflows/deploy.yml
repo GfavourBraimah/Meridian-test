@@ -37,23 +37,26 @@ jobs:
           docker build -t meridian-auth:${{ github.sha }} ./auth-service
           docker tag meridian-auth:${{ github.sha }} ${{ secrets.ECR_REGISTRY_URL }}/meridian-auth:${{ github.sha }}
 
-      # 4. TRIVY: Scan the Image & Generate HTML Report (Fails build if CRITICAL/HIGH found)
+      # 4. TRIVY: Download official HTML template and scan image
+      - name: Download Trivy HTML Template
+        run: wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -O html.tpl
+
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: '${{ secrets.ECR_REGISTRY_URL }}/meridian-auth:${{ github.sha }}'
           format: 'template'
-          template: '@/contrib/html.tpl'
+          template: '@html.tpl'
           output: 'trivy-security-report.html'
           severity: 'CRITICAL,HIGH'
-          exit-code: '1' # <--- This stops the build if vulns are detected!
+          exit-code: '1'
 
-      # 5. UPLOAD ARTIFACT: Saves the report even if the build fails
+      # 5. UPLOAD ARTIFACT: Clean name (No middleware text)
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
-        if: always() # <--- Ensures this runs even when Trivy fails the build
+        if: always()
         with:
-          name: middleware-security-report
+          name: trivy-security-report
           path: trivy-security-report.html
           retention-days: 30
 
