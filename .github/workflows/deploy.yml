@@ -14,7 +14,30 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # This is the magic step that sends the compose and nginx files to EC2!
+      # 1. We need AWS credentials in this job to modify the Security Group
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 2. Get the current dynamic IP of this specific GitHub Runner
+      - name: Get GitHub Runner IP
+        id: runner-ip
+        uses: haythem/public-ip@v1.3
+
+      # 3. Open the AWS Security Group door JUST for this runner
+      - name: Whitelist Runner IP
+        run: |
+          echo "Authorizing IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ secrets.AWS_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
+
+      # 4. Do the Secure Copy (SCP) now that the door is open
       - name: Copy docker-compose and nginx to EC2
         uses: appleboy/scp-action@v0.1.4
         with:
@@ -24,6 +47,7 @@ jobs:
           source: "docker-compose.yml,nginx/"
           target: "/home/${{ secrets.EC2_USERNAME }}/meridian-retail"
 
+      # 5. SSH in and run the deployment
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -31,16 +55,30 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # 1. Authenticate the EC2 instance with AWS ECR
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY_URL }}
             
-            # 2. Go to the folder where the SCP step just pasted our files
+            # Move Nginx conf to system folders and reload
+            sudo cp /home/${{ secrets.EC2_USERNAME }}/meridian-retail/nginx/meridian-http.conf /etc/nginx/sites-available/meridian
+            sudo ln -sf /etc/nginx/sites-available/meridian /etc/nginx/sites-enabled/
+            sudo rm -f /etc/nginx/sites-enabled/default
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            # Setup Docker Compose
             cd /home/${{ secrets.EC2_USERNAME }}/meridian-retail
-            
-            # 3. Create a .env file on the fly so Docker Compose knows exactly which unique IMAGE_TAG to pull
             echo "IMAGE_TAG=${{ github.sha }}" > .env
             echo "ECR_REGISTRY_URL=${{ secrets.ECR_REGISTRY_URL }}" >> .env
             
-            # 4. Pull the fresh immutable images and start them up
             docker compose pull
             docker compose up -d
+
+      # 6. Lock the door behind us (runs ALWAYS, even if a previous step failed)
+      - name: Revoke Runner IP from Security Group
+        if: always()
+        run: |
+          echo "Revoking IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ secrets.AWS_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
