@@ -35,7 +35,6 @@ resource "aws_security_group" "meridian_sg" {
     cidr_blocks = ["${chomp(data.http.my_ip.response_body)}/32"]
   }
 
-  # Allow all outbound traffic (so your EC2 can pull Docker images, run apt-get, etc.)
   egress {
     from_port   = 0
     to_port     = 0
