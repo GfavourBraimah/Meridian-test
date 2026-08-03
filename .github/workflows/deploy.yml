@@ -27,12 +27,12 @@ jobs:
         id: runner-ip
         uses: haythem/public-ip@v1.3
 
-      # 3. Open the AWS Security Group door JUST for this runner
+      # 3. Open the AWS Security Group door JUST for this runners
       - name: Whitelist Runner IP
         run: |
           echo "Authorizing IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
           aws ec2 authorize-security-group-ingress \
-            --group-id ${{ secrets.AWS_SG_ID }} \
+            --group-id ${{ secrets.AWS_SG_ID }} \  
             --protocol tcp \
             --port 22 \
             --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
