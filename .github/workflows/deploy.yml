@@ -27,15 +27,11 @@ jobs:
         id: runner-ip
         uses: haythem/public-ip@v1.3
 
-      # 3. Open the AWS Security Group door JUST for this runners
+     # 3. Open the AWS Security Group door JUST for this runner
       - name: Whitelist Runner IP
         run: |
           echo "Authorizing IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
-          aws ec2 authorize-security-group-ingress \
-            --group-id ${{ secrets.AWS_SG_ID }} \  
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
+          aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
 
       # 4. Do the Secure Copy (SCP) now that the door is open
       - name: Copy docker-compose and nginx to EC2
@@ -72,13 +68,9 @@ jobs:
             docker compose pull
             docker compose up -d
 
-      # 6. Lock the door behind us (runs ALWAYS, even if a previous step failed)
+     # 6. Lock the door behind us (runs ALWAYS, even if a previous step failed)
       - name: Revoke Runner IP from Security Group
         if: always()
         run: |
           echo "Revoking IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
-          aws ec2 revoke-security-group-ingress \
-            --group-id ${{ secrets.AWS_SG_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
+          aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
