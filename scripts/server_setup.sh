@@ -66,4 +66,11 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
 
+
+docker compose pull
+docker compose up -d
+
+            # 🚀 GET THE PADLOCK: Provision TLS certificate via Certbot HTTP-01 challenge
+sudo certbot --nginx -d shop-meridian.duckdns.org --non-interactive --agree-tos -m bogreaper05@gmail.com --redirect --keep-until-expiring
+
 echo "Server setup completed successfully! The EC2 is fully cooked and ready for GitHub Actions."
