@@ -27,7 +27,7 @@ jobs:
         id: runner-ip
         uses: haythem/public-ip@v1.3
 
-     # 3. Open the AWS Security Group door JUST for this runner
+      # 3. Open the AWS Security Group door JUST for this runner
       - name: Whitelist Runner IP
         run: |
           echo "Authorizing IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
@@ -68,7 +68,10 @@ jobs:
             docker compose pull
             docker compose up -d
 
-     # 6. Lock the door behind us (runs ALWAYS, even if a previous step failed)
+            # 🚀 GET THE PADLOCK: Provision TLS certificate via Certbot for shop-meridian.duckdns.org
+            sudo certbot --nginx -d shop-meridian.duckdns.org --non-interactive --agree-tos -m bogreaper05@gmail.com --redirect --keep-until-expiring
+
+      # 6. Lock the door behind us (runs ALWAYS, even if a previous step failed)
       - name: Revoke Runner IP from Security Group
         if: always()
         run: |
