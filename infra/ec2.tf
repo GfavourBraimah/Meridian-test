@@ -8,7 +8,7 @@ resource "aws_instance" "meridian_server" {
   key_name               = var.ssh_key_name
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
-  # Run your bash script automatically when the server starts
+
   user_data = file("${path.module}/../scripts/server_setup.sh")
 
   # Add some extra storage just in case the database and Docker images get heavy
