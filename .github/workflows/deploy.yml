@@ -24,7 +24,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}    
-          role-session-name: GitHubActionsOIDCSession
+          role-session-name: MeridianGitHubActionsOIDCRole
 
       # 2. Get the current dynamic IP of this specific GitHub Runner
       - name: Get GitHub Runner IP
