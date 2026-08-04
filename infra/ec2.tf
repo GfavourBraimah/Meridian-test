@@ -30,7 +30,7 @@ resource "aws_instance" "meridian_server" {
 # 1. Allocate a Static Elastic IP and attach it to the EC2 instance
 resource "aws_eip" "meridian_eip" {
   instance = aws_instance.meridian_server.id
-  domain   = "vpc" # Required for AWS Provider v5+
+  domain   = "vpc" 
 
   tags = {
     Name        = "Meridian-Static-IP"
