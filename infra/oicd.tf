@@ -22,7 +22,7 @@ resource "aws_iam_role" "github_actions_oidc" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringLike = {
-            "token.actions.githubusercontent.com:sub" : "repo:GfavourBraimah/Meridian-test:*"
+            "token.actions.githubusercontent.com:sub" : "repo:gfavourbraimah/meridian-test:*"
           }
           StringEquals = {
             "token.actions.githubusercontent.com:aud" : "sts.amazonaws.com"

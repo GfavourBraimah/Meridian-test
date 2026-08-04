@@ -1,29 +1,24 @@
-name: CI - Build, Scan, and Push to ECR
+name: CD - Deploy to EC2
 
 on:
-  push:
-    branches: [ "main" ]
+  workflow_run:
+    workflows: ["CI - Build, Scan, and Push to ECR"]
+    types:
+      - completed
 
 permissions:
-  id-token: write  
+  id-token: write  # Required for OIDC
   contents: read
 
 jobs:
-  security-and-build:
+  deploy:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
-      # 1. GITLEAKS: Prevent Secret Leaks
-      - name: Run Gitleaks Security Scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # 2. AWS OIDC LOGIN: Keyless authentication 🔓
+      # 1. AWS OIDC LOGIN (Keyless)
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -31,62 +26,58 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}    
           role-session-name: GitHubActionsOIDCSession
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+      # 2. Get the current dynamic IP of this specific GitHub Runner
+      - name: Get GitHub Runner IP
+        id: runner-ip
+        uses: haythem/public-ip@v1.3
 
-      # 3. Build, Tag, and Push ALL FOUR Microservices
-      - name: Build and Push Auth Service
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          TAG: ${{ github.sha }}
+      # 3. Open the AWS Security Group door JUST for this runner
+      - name: Whitelist Runner IP
         run: |
-          docker build -t $REGISTRY/meridian-auth:$TAG ./auth-service
-          docker push $REGISTRY/meridian-auth:$TAG
+          echo "Authorizing IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
+          aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
 
-      - name: Build and Push Catalog Service
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          TAG: ${{ github.sha }}
-        run: |
-          docker build -t $REGISTRY/meridian-catalog:$TAG ./catalog-service
-          docker push $REGISTRY/meridian-catalog:$TAG
-
-      - name: Build and Push Orders Service
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          TAG: ${{ github.sha }}
-        run: |
-          docker build -t $REGISTRY/meridian-orders:$TAG ./orders-service
-          docker push $REGISTRY/meridian-orders:$TAG
-
-      - name: Build and Push Frontend
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          TAG: ${{ github.sha }}
-        run: |
-          docker build -t $REGISTRY/meridian-frontend:$TAG ./frontend
-          docker push $REGISTRY/meridian-frontend:$TAG
-
-      # 4. TRIVY SCAN: Generates report non-blocking (exit-code: '0')
-      - name: Download Trivy HTML Template
-        run: wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -O html.tpl
-
-      - name: Run Trivy Vulnerability Scanner
-        uses: aquasecurity/trivy-action@master
+      # 4. Do the Secure Copy (SCP) now that the door is open
+      - name: Copy docker-compose and nginx to EC2
+        uses: appleboy/scp-action@v0.1.4
         with:
-          image-ref: '${{ steps.login-ecr.outputs.registry }}/meridian-auth:${{ github.sha }}'
-          format: 'template'
-          template: '@html.tpl'
-          output: 'trivy-security-report.html'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml,nginx/"
+          target: "/home/${{ secrets.EC2_USERNAME }}/meridian-retail"
 
-      # 5. UPLOAD REPORT ARTIFACT
-      - name: Upload Security Report
-        uses: actions/upload-artifact@v4
+      # 5. SSH in and run the deployment
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY_URL }}
+            
+            # Move Nginx conf to system folders and reload
+            sudo cp /home/${{ secrets.EC2_USERNAME }}/meridian-retail/nginx/meridian-http.conf /etc/nginx/sites-available/meridian
+            sudo ln -sf /etc/nginx/sites-available/meridian /etc/nginx/sites-enabled/
+            sudo rm -f /etc/nginx/sites-enabled/default
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            # Setup Docker Compose
+            cd /home/${{ secrets.EC2_USERNAME }}/meridian-retail
+            echo "IMAGE_TAG=${{ github.sha }}" > .env
+            echo "ECR_REGISTRY_URL=${{ secrets.ECR_REGISTRY_URL }}" >> .env
+            
+            docker compose pull
+            docker compose up -d
+
+            # 🚀 GET THE PADLOCK: Provision TLS certificate via Certbot
+            sudo certbot --nginx -d shop-meridian.duckdns.org --non-interactive --agree-tos -m bogreaper05@gmail.com --redirect --keep-until-expiring
+
+      # 6. Lock the door behind us (runs ALWAYS, even if a previous step failed)
+      - name: Revoke Runner IP from Security Group
         if: always()
-        with:
-          name: trivy-security-report
-          path: trivy-security-report.html
-          retention-days: 30
+        run: |
+          echo "Revoking IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
+          aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
