@@ -44,16 +44,4 @@ echo "0 2 * * * root /bin/bash /home/ubuntu/meridian-retail/scripts/backup_db.sh
 chmod 0644 /etc/cron.d/meridian-backup
 systemctl restart cron
 
-# ==============================================================================
-# 7. NEW: Auto-Pull and Start Containers on First Boot via EC2 IAM Instance Profile
-# ==============================================================================
-echo "Authenticating Docker with Amazon ECR..."
-# Get the region dynamically from the instance metadata service
-AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
-ACCOUNT_ID="183631303948" # Your AWS account ID
-ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-
-# Log into ECR using the EC2 instance's IAM role permissions
-aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
-
-echo "Server infrastructure bootstrapping and ECR authentication completed successfully!"
+echo "Server infrastructure bootstrapping completed successfully!"
