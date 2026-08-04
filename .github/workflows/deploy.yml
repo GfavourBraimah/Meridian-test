@@ -2,7 +2,7 @@ name: CD - Deploy to EC2
 
 on:
   workflow_run:
-    workflows: ["CI - Build and Push to ECR"] # 🚨 FIXED: Now matches the CI name perfectly!
+    workflows: ["CI - Build and Push to ECR"] 
     types:
       - completed
 
@@ -13,6 +13,40 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
+      
+      # Gitleaks Secret Scanner
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          report-format: json
+          report-path: gitleaks-report.json
+        continue-on-error: true
+
+      # Trivy Vulnerability Scanner (Outputs HTML)
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          format: 'template'
+          template: '@/contrib/html.tpl'
+          output: 'trivy-report.html'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+        continue-on-error: true
+
+      # Upload Reports so you can download them from GitHub Actions UI
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            gitleaks-report.json
+            trivy-report.html
+            
+      # --- END SECURITY SCANS ---
 
       # 1. AWS Static Key Login
       - name: Configure AWS Credentials
@@ -33,7 +67,7 @@ jobs:
           echo "Authorizing IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
           aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
 
-    # 4. Do the Secure Copy (SCP) - Added scripts/ folder here!
+      # 4. Do the Secure Copy (SCP) - Added scripts/ folder here!
       - name: Copy docker-compose, nginx, and scripts to EC2
         uses: appleboy/scp-action@v0.1.4
         with:
