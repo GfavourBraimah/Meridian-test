@@ -1,0 +1,11 @@
+/node_modules
+.env
+/dist
+dump.rdb
+swagger.json
+/src/generated/prisma
+generate-keys.ts
+test_decrypt.js
+test_decrypt2.ts
+test_decrypt3.ts
+scripts/generate-headers.js
