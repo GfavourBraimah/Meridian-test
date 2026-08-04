@@ -23,7 +23,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. AWS OIDC LOGIN: No static keys needed anymore! 🔓
+      # 2. AWS OIDC LOGIN: Keyless authentication 🔓
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -35,25 +35,52 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      # 3. Build your Docker image
-      - name: Build Docker Image
+      # 3. Build, Tag, and Push ALL FOUR Microservices
+      - name: Build and Push Auth Service
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
         run: |
-          docker build -t meridian-auth:${{ github.sha }} ./auth-service
-          docker tag meridian-auth:${{ github.sha }} ${{ secrets.ECR_REGISTRY_URL }}/meridian-auth:${{ github.sha }}
+          docker build -t $REGISTRY/meridian-auth:$TAG ./auth-service
+          docker push $REGISTRY/meridian-auth:$TAG
 
-      # 4. TRIVY SCAN: Generates report, but lets the build pass (exit-code: '0')
+      - name: Build and Push Catalog Service
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/meridian-catalog:$TAG ./catalog-service
+          docker push $REGISTRY/meridian-catalog:$TAG
+
+      - name: Build and Push Orders Service
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/meridian-orders:$TAG ./orders-service
+          docker push $REGISTRY/meridian-orders:$TAG
+
+      - name: Build and Push Frontend
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/meridian-frontend:$TAG ./frontend
+          docker push $REGISTRY/meridian-frontend:$TAG
+
+      # 4. TRIVY SCAN: Generates report non-blocking (exit-code: '0')
       - name: Download Trivy HTML Template
         run: wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -O html.tpl
 
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ secrets.ECR_REGISTRY_URL }}/meridian-auth:${{ github.sha }}'
+          image-ref: '${{ steps.login-ecr.outputs.registry }}/meridian-auth:${{ github.sha }}'
           format: 'template'
           template: '@html.tpl'
           output: 'trivy-security-report.html'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0' # <--- Non-blocking report generation
+          exit-code: '0'
 
       # 5. UPLOAD REPORT ARTIFACT
       - name: Upload Security Report
@@ -63,8 +90,3 @@ jobs:
           name: trivy-security-report
           path: trivy-security-report.html
           retention-days: 30
-
-      # 6. Push to ECR using temporary OIDC credentials
-      - name: Push Image to ECR
-        run: |
-          docker push ${{ secrets.ECR_REGISTRY_URL }}/meridian-auth:${{ github.sha }}
