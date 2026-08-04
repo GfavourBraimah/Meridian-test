@@ -20,7 +20,7 @@ jobs:
 
       # 1. AWS OIDC LOGIN (Keyless)
       - name: Configure AWS Credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}    
