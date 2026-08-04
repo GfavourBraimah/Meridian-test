@@ -15,14 +15,13 @@ jobs:
         uses: actions/checkout@v3
 
       # --- SECURITY SCANS ---
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          report-format: json
-          report-path: gitleaks-report.json
-        continue-on-error: true
+      
+      # 🚀 FIX: Run Gitleaks natively to bypass the Action limitation
+      - name: Run Gitleaks natively
+        run: |
+          wget https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
+          tar -xzf gitleaks_8.18.2_linux_x64.tar.gz
+          ./gitleaks detect --source . --report-path gitleaks-report.json --report-format json || true
 
       # Download the HTML template directly so Trivy doesn't output a blank file
       - name: Download Trivy HTML Template
@@ -40,7 +39,7 @@ jobs:
           exit-code: '0'
         continue-on-error: true
 
-      # Upload Reports so you can download them from GitHub Actions UI
+      # Upload Reports (Note: GitHub will zip these automatically!)
       - name: Upload Security Reports
         uses: actions/upload-artifact@v4
         with:
@@ -59,7 +58,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}    
 
-      # 2. 🚀 FIX: Get GitHub Runner IP natively (No more Node deprecation wahala!)
+      # 2. Get GitHub Runner IP natively
       - name: Get GitHub Runner IP
         id: runner-ip
         run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
@@ -111,7 +110,7 @@ jobs:
             # Provision TLS certificate via Certbot
             sudo certbot --nginx -d shop-meridian.duckdns.org --non-interactive --agree-tos -m bogreaper05@gmail.com --redirect --keep-until-expiring
 
-      # 6. 🚀 FIX: Revoke Runner IP with a Safety Check!
+      # 6. Revoke Runner IP with Safety Check
       - name: Revoke Runner IP
         if: always()
         run: |
