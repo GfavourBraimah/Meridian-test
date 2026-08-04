@@ -19,4 +19,4 @@ echo "Restoring Meridian database from $BACKUP_FILE..."
 # Unzip the backup file on the fly and pipe it into the postgres container
 gunzip -c "$BACKUP_FILE" | docker exec -i postgres psql -U meridian -d meridian_db
 
-echo "Restore completed successfully, bro!"
+echo "Restore completed successfully"
