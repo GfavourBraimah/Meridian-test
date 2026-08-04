@@ -11,7 +11,7 @@ variable "ami_id" {
 variable "instance_type" {
   description = "The EC2 instance size"
   type        = string
-  default     = "t3.medium" # t2.micro might crash with 4 containers + Postgres!
+  default     = "t3.medium" 
 }
 
 variable "ssh_key_name" {

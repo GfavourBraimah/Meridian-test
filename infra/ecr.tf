@@ -1,4 +1,4 @@
-# ecr.tf
+
 
 resource "aws_ecr_repository" "meridian_frontend" {
   name                 = "meridian-frontend"

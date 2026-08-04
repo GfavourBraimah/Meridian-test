@@ -15,7 +15,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # 1. AWS Static Key Login
+      
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -27,7 +27,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      # 2. Build, Tag, and Push
+      
       - name: Build and push Auth Service
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

@@ -1,5 +1,4 @@
 
-
 resource "aws_instance" "meridian_server" {
   ami                    = var.ami_id
   instance_type          = var.instance_type
@@ -11,7 +10,6 @@ resource "aws_instance" "meridian_server" {
 
   user_data = file("${path.module}/../scripts/server_setup.sh")
 
-  # Add some extra storage just in case the database and Docker images get heavy
   root_block_device {
     volume_size = 20
     volume_type = "gp3"
@@ -27,7 +25,7 @@ resource "aws_instance" "meridian_server" {
 
 
 
-# 1. Allocate a Static Elastic IP and attach it to the EC2 instance
+
 resource "aws_eip" "meridian_eip" {
   instance = aws_instance.meridian_server.id
   domain   = "vpc" 

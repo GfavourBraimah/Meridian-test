@@ -1,6 +1,4 @@
-# security.tf
 
-# 1. Automatically fetch your current public IP address
 data "http" "my_ip" {
   url = "https://ipv4.icanhazip.com"
 }

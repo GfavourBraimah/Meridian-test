@@ -1,4 +1,3 @@
-# network.tf
 
 # Create the VPC
 resource "aws_vpc" "meridian_vpc" {
