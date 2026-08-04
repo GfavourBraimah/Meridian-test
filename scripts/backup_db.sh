@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o pipefail # 🚨 Crucial: Catches errors inside pipes!
 
 # Define the backup directory and filename with a timestamp
 BACKUP_DIR="./backups"
@@ -10,10 +11,10 @@ mkdir -p "$BACKUP_DIR"
 
 echo "Starting database backup for Meridian Retail..."
 
-# Execute pg_dump inside the postgres container, include --clean to make restores easier
-docker exec postgres pg_dump -U meridian --clean meridian_db | gzip > "$BACKUP_FILE"
+# Use "postgres" user (matches your docker-compose config)
+docker exec postgres pg_dump -U postgres --clean meridian_db | gzip > "$BACKUP_FILE"
 
-# Check if the backup file was created and is not empty
+# Check if the backup file was created and is not empty (> 0 bytes)
 if [ -s "$BACKUP_FILE" ]; then
     echo "Backup successful! Saved to: $BACKUP_FILE"
 else
@@ -21,4 +22,3 @@ else
     rm -f "$BACKUP_FILE"
     exit 1
 fi
-
