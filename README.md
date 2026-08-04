@@ -57,9 +57,9 @@ To expose the internal Docker microservices securely to the internet, a producti
 *   **SSL/TLS Cryptography:** Integrated Let's Encrypt via **Certbot** to automatically provision and bind SSL certificates to the Nginx server, enforcing strict HTTP-to-HTTPS (301) redirects for data-in-transit encryption.
 
 
-**D4**  ![ GitHub Actions workflow run](/images/D4.png)
-  **D5**  ![ GitHub Actions workflow run](/images/D5.png)
- **D6** ![ GitHub Actions workflow run](/images/D6.png)
+**D4**     Nginx routes all four paths correctly![ D4](/images/D4.png)
+  **D5**  HTTPS active with valid certificate  ![  D5](/images/D5.png)
+ **D6**   HTTP redirects to HTTPS ![ D6](/images/D6.png)
 
 ### Solving the API Routing & Trailing Slash Issue
 During deployment, the FastAPI `orders-service` triggered `307 Temporary Redirect` errors resulting in cross-origin "Failed to fetch" blockages on POST requests. This was resolved by meticulously configuring Nginx to proxy the requests without trailing slashes.
@@ -89,11 +89,14 @@ The Meridian Retail application ecosystem is fully containerized and orchestrate
 
   **D2** - Showing the PostgreSQL terminal output running `SELECT * FROM products;` confirming the 5 seed items exist.  ![ GitHub Actions workflow run](/images/D2.png)
 
- **D3** - Showing the frontend UI fully loaded in the browser. ![ D3](/images/D3.png)
 
-   **Dig DNS** ![ Dig DNS](/images/D3b.png)
+   **D3 Dig DNS** ![ Dig DNS](/images/D3b.png)
 
- **D7** - Show the end-to-end flow: the UI displaying products, a successful login, and an order successfully placed.![ D7](/images/D7.png)
+ The UI displaying products, a successful login, ![ D3](/images/D3.png)
+
+
+ **D7** - Shows the end-to-end flow: and an order successfully placed.![ D7](/images/D7.png)
+
 
 ### Business Continuity & Disaster Recovery
 To ensure resilience against accidental deletion or corruption, automated backup and recovery scripts were engineered for the database layer:

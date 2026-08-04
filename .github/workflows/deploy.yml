@@ -24,10 +24,11 @@ jobs:
           report-path: gitleaks-report.json
         continue-on-error: true
 
+      # Download the HTML template directly so Trivy doesn't output a blank file
       - name: Download Trivy HTML Template
         run: wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
 
-      # Trivy Vulnerability Scanner (Now uses the downloaded template)
+      # Trivy Vulnerability Scanner
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@master
         with:
@@ -58,10 +59,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}    
 
-      # 2. Get the current dynamic IP of this specific GitHub Runner
+      # 2. 🚀 FIX: Get GitHub Runner IP natively (No more Node deprecation wahala!)
       - name: Get GitHub Runner IP
         id: runner-ip
-        uses: haythem/public-ip@v1.3
+        run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
 
       # 3. Open the AWS Security Group door JUST for this runner
       - name: Whitelist Runner IP
@@ -69,7 +70,7 @@ jobs:
           echo "Authorizing IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
           aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
 
-      # 4. Do the Secure Copy (SCP) - Added scripts/ folder here!
+      # 4. Do the Secure Copy (SCP)
       - name: Copy docker-compose, nginx, and scripts to EC2
         uses: appleboy/scp-action@v0.1.4
         with:
@@ -110,9 +111,13 @@ jobs:
             # Provision TLS certificate via Certbot
             sudo certbot --nginx -d shop-meridian.duckdns.org --non-interactive --agree-tos -m bogreaper05@gmail.com --redirect --keep-until-expiring
 
-      # 6. 🚨 ENTERPRISE SECURITY FIX: Close the AWS Security Group door!
+      # 6. 🚀 FIX: Revoke Runner IP with a Safety Check!
       - name: Revoke Runner IP
-        if: always() # This ensures it runs even if the deployment fails!
+        if: always()
         run: |
-          echo "Revoking IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
-          aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
+          if [ -z "${{ steps.runner-ip.outputs.ipv4 }}" ]; then
+            echo "No IP was fetched, skipping revoke."
+          else
+            echo "Revoking IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
+            aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32 || true
+          fi
