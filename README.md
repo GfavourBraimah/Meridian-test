@@ -106,19 +106,4 @@ To ensure resilience against accidental deletion or corruption, automated backup
 
 **D9** - Showing the terminal output of the `restore_db.sh` script successfully completing and restoring the database. ![ D9](/images/D9.png)
 >
-> [ **INSERT SCREENSHOT HERE: D10** - Insert a screenshot of this completed README or your GitHub repository structure, proving all deliverables are compiled and documented.]
-
-meridian-retail/
-├── .github/
-│   └── workflows/
-│       ├── ci-build-push.yml    # Builds the 4 images, scans with Trivy/Gitleaks, pushes to ECR
-│       └── cd-deploy-ec2.yml    # Whitelists IP, SCPs files, SSHes into EC2, and redeploys
-├── docker-compose.yml           # Orchestrates Frontend, Auth, Catalog, Orders, and PostgreSQL
-├── nginx/
-│   └── meridian-http.conf       # Reverse proxy, API routing, and SSL configuration
-├── scripts/
-│   ├── backup_db.sh             # Disaster recovery database dump script
-│   └── restore_db.sh            # Disaster recovery database restore script
-└── README.md                    # The Masterclass Deployment Report
-
-*Architecture and deployment executed by God'sfavour Braimah for Meridian Retail. Engineered for resilience. Built for scale.*
+ **10** CI/CD pipeline deploys on push to main ![ D9](/images/D10.png)
