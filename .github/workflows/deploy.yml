@@ -2,13 +2,9 @@ name: CD - Deploy to EC2
 
 on:
   workflow_run:
-    workflows: ["CI - Build, Scan, and Push to ECR"]
+    workflows: ["CI - Build and Push to ECR"] # 🚨 FIXED: Now matches the CI name perfectly!
     types:
       - completed
-
-permissions:
-  id-token: write  # Required for OIDC
-  contents: read
 
 jobs:
   deploy:
@@ -18,11 +14,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # 1. AWS OIDC LOGIN (Keyless)
-      - name: Configure AWS Credentials via OIDC
+      # 1. AWS Static Key Login
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}    
 
       # 2. Get the current dynamic IP of this specific GitHub Runner
@@ -71,10 +68,10 @@ jobs:
             docker compose pull
             docker compose up -d
 
-            # 🚀 GET THE PADLOCK: Provision TLS certificate via Certbot
+            # Provision TLS certificate via Certbot
             sudo certbot --nginx -d shop-meridian.duckdns.org --non-interactive --agree-tos -m bogreaper05@gmail.com --redirect --keep-until-expiring
 
-      # 6. Lock the door behind us (runs ALWAYS, even if a previous step failed)
+      # 6. Lock the door behind us
       - name: Revoke Runner IP from Security Group
         if: always()
         run: |
