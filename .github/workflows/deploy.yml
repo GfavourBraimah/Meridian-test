@@ -33,17 +33,17 @@ jobs:
           echo "Authorizing IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
           aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
 
-      # 4. Do the Secure Copy (SCP) now that the door is open
-      - name: Copy docker-compose and nginx to EC2
+    # 4. Do the Secure Copy (SCP) - Added scripts/ folder here!
+      - name: Copy docker-compose, nginx, and scripts to EC2
         uses: appleboy/scp-action@v0.1.4
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml,nginx/"
+          source: "docker-compose.yml,nginx/,scripts/"
           target: "/home/${{ secrets.EC2_USERNAME }}/meridian-retail"
 
-      # 5. SSH in and run the deployment
+      # 5. SSH in, set script permissions, and run the deployment
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -53,6 +53,9 @@ jobs:
           script: |
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY_URL }}
             
+            # Make sure all shell scripts are executable
+            chmod +x /home/${{ secrets.EC2_USERNAME }}/meridian-retail/scripts/*.sh
+
             # Move Nginx conf to system folders and reload
             sudo cp /home/${{ secrets.EC2_USERNAME }}/meridian-retail/nginx/meridian-http.conf /etc/nginx/sites-available/meridian
             sudo ln -sf /etc/nginx/sites-available/meridian /etc/nginx/sites-enabled/
@@ -70,10 +73,3 @@ jobs:
 
             # Provision TLS certificate via Certbot
             sudo certbot --nginx -d shop-meridian.duckdns.org --non-interactive --agree-tos -m bogreaper05@gmail.com --redirect --keep-until-expiring
-
-      # 6. Lock the door behind us
-      - name: Revoke Runner IP from Security Group
-        if: always()
-        run: |
-          echo "Revoking IP: ${{ steps.runner-ip.outputs.ipv4 }}/32 for SSH"
-          aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.runner-ip.outputs.ipv4 }}/32
